@@ -1,30 +1,42 @@
-import express from "express";
-import morgan from "morgan";
+import fs from "fs";
+import path from "path";
 import {
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
-  NetworkingV1Api
+  NetworkingV1Api,
 } from "@kubernetes/client-node";
 
-const PORT = process.env.PORT || 8000;
-
-/** Load KubeConfig: try in-cluster first, fallback to default kubeconfig */
-function getKubeClients() {
+function loadKubeConfigRobust() {
   const kc = new KubeConfig();
-  try {
+
+  // Check for in-cluster service account files explicitly
+  const saDir = "/var/run/secrets/kubernetes.io/serviceaccount";
+  const tokenPath = path.join(saDir, "token");
+  const caPath = path.join(saDir, "ca.crt");
+  const inClusterFilesExist = fs.existsSync(tokenPath) && fs.existsSync(caPath);
+  const inClusterEnvPresent = !!process.env.KUBERNETES_SERVICE_HOST;
+
+  if (inClusterFilesExist && inClusterEnvPresent) {
     kc.loadFromCluster();
-  } catch (_) {
+  } else {
+    // Will use $KUBECONFIG if set, else ~/.kube/config
     kc.loadFromDefault();
   }
+  return kc;
+}
+
+function getKubeClients() {
+  const kc = loadKubeConfigRobust();
   return {
     core: kc.makeApiClient(CoreV1Api),
     apps: kc.makeApiClient(AppsV1Api),
-    net: kc.makeApiClient(NetworkingV1Api)
+    net: kc.makeApiClient(NetworkingV1Api),
   };
 }
 
 const { core, apps, net } = getKubeClients();
+
 const app = express();
 app.use(morgan("tiny"));
 
