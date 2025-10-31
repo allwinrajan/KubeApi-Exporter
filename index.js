@@ -7,24 +7,45 @@ import {
   NetworkingV1Api,
 } from "@kubernetes/client-node";
 
+import fs from "fs";
+import path from "path";
+import { KubeConfig } from "@kubernetes/client-node";
+
 function loadKubeConfigRobust() {
   const kc = new KubeConfig();
 
-  // Check for in-cluster service account files explicitly
+  // 1) In-cluster only if SA files exist
   const saDir = "/var/run/secrets/kubernetes.io/serviceaccount";
-  const tokenPath = path.join(saDir, "token");
-  const caPath = path.join(saDir, "ca.crt");
-  const inClusterFilesExist = fs.existsSync(tokenPath) && fs.existsSync(caPath);
-  const inClusterEnvPresent = !!process.env.KUBERNETES_SERVICE_HOST;
+  const inCluster =
+    !!process.env.KUBERNETES_SERVICE_HOST &&
+    fs.existsSync(path.join(saDir, "token")) &&
+    fs.existsSync(path.join(saDir, "ca.crt"));
 
-  if (inClusterFilesExist && inClusterEnvPresent) {
+  if (inCluster) {
     kc.loadFromCluster();
-  } else {
-    // Will use $KUBECONFIG if set, else ~/.kube/config
-    kc.loadFromDefault();
+    return kc;
   }
+
+  // 2) Known-good out-of-cluster candidates
+  const home = process.env.HOME || "/root";
+  const candidates = [
+    process.env.KUBECONFIG,
+    "/etc/kubernetes/admin.conf",
+    path.join(home, ".kube", "config"),
+    "/root/.kube/config",
+    "/home/administrator/.kube/config"
+  ].filter(Boolean).filter(p => fs.existsSync(p));
+
+  if (candidates.length > 0) {
+    kc.loadFromFile(candidates[0]);
+    return kc;
+  }
+
+  // 3) Last resort
+  kc.loadFromDefault();
   return kc;
 }
+
 
 function getKubeClients() {
   const kc = loadKubeConfigRobust();
