@@ -1,15 +1,13 @@
 import fs from "fs";
 import path from "path";
+import express from "express";
+import morgan from "morgan";
 import {
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
   NetworkingV1Api,
 } from "@kubernetes/client-node";
-
-import fs from "fs";
-import path from "path";
-import { KubeConfig } from "@kubernetes/client-node";
 
 function loadKubeConfigRobust() {
   const kc = new KubeConfig();
@@ -20,7 +18,6 @@ function loadKubeConfigRobust() {
     !!process.env.KUBERNETES_SERVICE_HOST &&
     fs.existsSync(path.join(saDir, "token")) &&
     fs.existsSync(path.join(saDir, "ca.crt"));
-
   if (inCluster) {
     kc.loadFromCluster();
     return kc;
@@ -33,7 +30,7 @@ function loadKubeConfigRobust() {
     "/etc/kubernetes/admin.conf",
     path.join(home, ".kube", "config"),
     "/root/.kube/config",
-    "/home/administrator/.kube/config"
+    "/home/administrator/.kube/config",
   ].filter(Boolean).filter(p => fs.existsSync(p));
 
   if (candidates.length > 0) {
@@ -45,7 +42,6 @@ function loadKubeConfigRobust() {
   kc.loadFromDefault();
   return kc;
 }
-
 
 function getKubeClients() {
   const kc = loadKubeConfigRobust();
@@ -60,6 +56,7 @@ const { core, apps, net } = getKubeClients();
 
 const app = express();
 app.use(morgan("tiny"));
+
 
 /** Extract common list params from query string */
 function parseListParams(req) {
