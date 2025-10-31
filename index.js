@@ -9,6 +9,8 @@ import {
   NetworkingV1Api,
 } from "@kubernetes/client-node";
 
+const PORT = Number(process.env.PORT || 8000);
+
 function loadKubeConfigRobust() {
   const kc = new KubeConfig();
 
