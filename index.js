@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import express from "express";
 import morgan from "morgan";
+import cors from cors;
+
 import {
   KubeConfig,
   CoreV1Api,
@@ -57,6 +59,12 @@ function getKubeClients() {
 const { core, apps, net } = getKubeClients();
 
 const app = express();
+
+app.use(cors({
+  origin: ["http://localhost:5173", "http://192.168.9.173:5173"],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+}));
+
 app.use(morgan("tiny"));
 
 
@@ -100,7 +108,7 @@ function sendError(res, err) {
   });
 }
 
-app.get("/api/health", (req, res) => res.json({ ok: true }));
+app.get("/api/health", (req, res) => res.json({ ok: true, res }));
 
 /** ---- NAMESPACES ---- */
 app.get("/api/namespaces", async (req, res) => {
